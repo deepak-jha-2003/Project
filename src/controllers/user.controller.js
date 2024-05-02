@@ -150,8 +150,8 @@ const logoutUser = asyncHandle(async(req ,res) =>{
     await User.findByIdAndUpdate(
         req.user._id,
         {
-            $set:{
-                refreshToken: undefined
+            $unset:{
+                refreshToken: 1 // this remove the field from document
             }
         },
         {
@@ -336,41 +336,41 @@ const getUserChannelProfile = asyncHandle(async(req , res) => {
     const {username} = req.params
 
     if (!username?.trim()) {
-        throw new ApiError (400 , "username is missing" )
+        throw new ApiError(400, "username is missing")
     }
 
     const channel = await User.aggregate([
         {
-            $match:{
+            $match: {
                 username: username?.toLowerCase()
             }
         },
         {
-            $lookup:{
-                from:"subscriptions",
-                localField:"_id",
-                foreignField:"channel",
-                as:"subscribers"
+            $lookup: {
+                from: "subscriptions",
+                localField: "_id",
+                foreignField: "channel",
+                as: "subscribers"
             }
         },
         {
-            $lookup:{
-                from:"subscriptions",
-                localField:"_id",
-                foreignField:"subscriber",
-                as:"subscribedTo"
+            $lookup: {
+                from: "subscriptions",
+                localField: "_id",
+                foreignField: "subscriber",
+                as: "subscribedTo"
             }
         },
         {
-            $addFields:{
-                subscribersCount:{
+            $addFields: {
+                subscribersCount: {
                     $size: "$subscribers"
                 },
-                channelSubscribedToCount:{
+                channelsSubscribedToCount: {
                     $size: "$subscribedTo"
                 },
-                isSubscribed:{
-                    $cond:{
+                isSubscribed: {
+                    $cond: {
                         if: {$in: [req.user?._id, "$subscribers.subscriber"]},
                         then: true,
                         else: false
@@ -383,15 +383,17 @@ const getUserChannelProfile = asyncHandle(async(req , res) => {
                 fullName: 1,
                 username: 1,
                 subscribersCount: 1,
-                channelSubscribedToCount: 1,
+                channelsSubscribedToCount: 1,
                 isSubscribed: 1,
                 avatar: 1,
-                covarImage: 1,
+                coverImage: 1,
                 email: 1
 
             }
         }
     ])
+
+    console.log(channel);
 
     if (!channel?.length) {
         throw new ApiError(400 , "channel does not exist")
@@ -407,26 +409,26 @@ const getUserChannelProfile = asyncHandle(async(req , res) => {
 const getWatchHistory = asyncHandle(async(req , res) => {
     const user = await User.aggregate([
         {
-            $match:{    
-                _id: new mongoose.Types.ObjectId(req.body._id)
+            $match: {
+                _id: new mongoose.Types.ObjectId(req.user._id)
             }
         },
         {
-            $lookup:{
+            $lookup: {
                 from: "videos",
-                localField:"watchHistory",
-                foreignField:"_id",
-                as:"watchHistory",
-                pipeline:[
+                localField: "watchHistory",
+                foreignField: "_id",
+                as: "watchHistory",
+                pipeline: [
                     {
-                        $lookup:{
-                            from:"users",
-                            localField:"owner",
-                            foreignField:"_id",
-                            as:"owner",
-                            pipeline:[
+                        $lookup: {
+                            from: "users",
+                            localField: "owner",
+                            foreignField: "_id",
+                            as: "owner",
+                            pipeline: [
                                 {
-                                    $project:{
+                                    $project: {
                                         fullName: 1,
                                         username: 1,
                                         avatar: 1
@@ -437,7 +439,7 @@ const getWatchHistory = asyncHandle(async(req , res) => {
                     },
                     {
                         $addFields:{
-                            owner: {
+                            owner:{
                                 $first: "$owner"
                             }
                         }
@@ -453,7 +455,7 @@ const getWatchHistory = asyncHandle(async(req , res) => {
         new ApiResponse(
             200,
             user[0].watchHistory,
-            "watch history fatched successfully"
+            "Watch history fetched successfully"
         )
     )
 })
